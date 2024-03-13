@@ -46,24 +46,22 @@ unsigned char get_page_table(int proc_num)
 //
 // This includes the new process page table and page_count data pages.
 //
-void new_process(int proc_num, int page_count){
-    // Allocate a page table page
-    int page_table = 0;
+
+int setup_page_table(){
+int page_table = 0;
     for (int i = 1; i < PAGE_COUNT; i++) {
         if (mem[i] == 0) {
             page_table = i;
             mem[i] = 1;
-            break;
+            return page_table;
         }
     }
-    if(page_table == 0)
-    {
-      printf("OOM: proc %d: page table\n", proc_num);
-      exit(1);
-    }
-    
-    //allocate process page(s)
-    for (int i = 0; i < page_count; i++) {
+    return 0;
+}
+
+
+void find_free_pages(int proc_num, int page_count, int page_table){
+for (int i = 0; i < page_count; i++) {
         int page = 0;
         for (int j = 1; j < PAGE_COUNT; j++) {
             if (mem[j] == 0) {
@@ -77,14 +75,42 @@ void new_process(int proc_num, int page_count){
           printf("OOM: proc %d: page %d\n", proc_num, i);
           exit(1);
         }
-
         //page table
         mem[get_address(page_table, i)] = page;
     }
+}
+
+void new_process(int proc_num, int page_count){
+    // Allocate a page table page
+    int page_table = 0;
+    page_table = setup_page_table();
+    if(page_table == 0)
+    {
+      printf("OOM: proc %d: page table\n", proc_num);
+      exit(1);
+    }
+    
+    //allocate process page(s)
+    find_free_pages(proc_num, page_count, page_table);
 
     //page table pointer
     mem[get_address(0, PTP_OFFSET + proc_num)] = page_table;
+    //printf("page table page:%d", mem[get_address(0, PTP_OFFSET + proc_num)]);
 
+}
+
+
+void kill_process(int proc_num){
+    int page_table = get_page_table(proc_num);
+    for (int i = 0; i < PAGE_COUNT; i++) {
+        int addr = get_address(page_table, i);
+        int page = mem[addr];
+        if (page != 0) {
+            mem[page] = 0;
+        }
+    }
+    mem[page_table] = 0;
+    mem[get_address(0, PTP_OFFSET + proc_num)] = 0;
 }
   
 //
@@ -157,6 +183,11 @@ int main(int argc, char *argv[])
             int page_count = atoi(argv[++i]);
             new_process(proc_num, page_count);
         }
+        else if (strcmp(argv[i], "kp") == 0) {
+            int proc_num = atoi(argv[++i]);
+            kill_process(proc_num);
+        }
+            
 
 
         // TODO: more command line arguments
