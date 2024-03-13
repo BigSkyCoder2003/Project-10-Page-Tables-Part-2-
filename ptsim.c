@@ -99,20 +99,58 @@ void new_process(int proc_num, int page_count){
 
 }
 
-
-void kill_process(int proc_num){
-    int page_table = get_page_table(proc_num);
-    for (int i = 0; i < PAGE_COUNT; i++) {
+void free_process_pages(int page_table){
+for (int i = 0; i < PAGE_COUNT; i++) {
         int addr = get_address(page_table, i);
         int page = mem[addr];
         if (page != 0) {
             mem[page] = 0;
         }
     }
-    mem[page_table] = 0;
-    mem[get_address(0, PTP_OFFSET + proc_num)] = 0;
 }
+
+void free_process_page_table(int proc_num, int page_table){
+mem[page_table] = 0;
+mem[get_address(0, PTP_OFFSET + proc_num)] = 0;
+}
+
+void kill_process(int proc_num){
+    int page_table = get_page_table(proc_num);
+    free_process_pages(page_table);
+    free_process_page_table(proc_num, page_table);
+}
+
+int vaddr_to_paddr(int proc_num, int vaddr)
+{
+int page_table = get_page_table(proc_num);
+
+  int virtual_page = vaddr >> PAGE_SHIFT;
+  int offset = vaddr & 255;
+  int page_table_entry = mem[get_address(page_table, virtual_page)];
+  return (page_table_entry << PAGE_SHIFT) | offset;
+}
+
+void store_value(int proc_num, int vaddr, int value){
   
+  int phys_addr = vaddr_to_paddr(proc_num, vaddr);
+
+  mem[phys_addr] = value;
+
+ printf("Store proc %d: %d => %d, value=%d\n",
+    proc_num, vaddr, phys_addr, value);   
+}
+
+void get_value(int proc_num, int vaddr){
+    
+  int phys_addr = vaddr_to_paddr(proc_num, vaddr);
+
+  int value = mem[phys_addr];
+
+  printf("Load proc %d: %d => %d, value=%d\n",
+    proc_num, vaddr, phys_addr, value);
+}
+
+
 //
 // Print the free page map
 //
@@ -187,8 +225,20 @@ int main(int argc, char *argv[])
             int proc_num = atoi(argv[++i]);
             kill_process(proc_num);
         }
+        else if (strcmp(argv[i], "sb") == 0) {
+            int proc_num = atoi(argv[++i]);
+            int vaddr = atoi(argv[++i]);
+            int value = atoi(argv[++i]);
+            store_value(proc_num, vaddr, value);
+        }
+        else if (strcmp(argv[i], "lb") == 0) {
+            int proc_num = atoi(argv[++i]);
+            int vaddr = atoi(argv[++i]);
+            get_value(proc_num, vaddr);
+        }
             
-
+// sb n a b: For process n at virtual address a, store the value b.
+// lb n a: For process n, get the value at virtual address a.
 
         // TODO: more command line arguments
     }
